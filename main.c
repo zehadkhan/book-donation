@@ -18,6 +18,8 @@ typedef struct {
 typedef struct {
     char username[100];
     char password[100];
+    char contactNumber[20];
+    char email[100];
     bool loggedIn;
 } User;
 
@@ -27,15 +29,24 @@ int userCount = 0;
 Book books[MAX_BOOKS];
 int bookCount = 0;
 
-void displayMenu() {
+void displayMenu(User* user) {
     printf("\nBook Buddies - Donate Used Books\n");
-    printf("1. Register\n");
-    printf("2. Login\n");
-    printf("3. Donate a book\n");
-    printf("4. List all donated books\n");
-    printf("5. Request a book\n");
-    printf("6. Exit\n");
+    if (user && user->loggedIn) {
+        printf("1. Donate a book\n");
+        printf("2. List all donated books\n");
+        printf("3. Request a book\n");
+        printf("4. Logout (Currently logged in as: %s)\n", user->username);
+        printf("5. Exit\n");
+    } else {
+        printf("1. Register\n");
+        printf("2. Login\n");
+        printf("3. Donate a book\n");
+        printf("4. List all donated books\n");
+        printf("5. Request a book\n");
+        printf("6. Exit\n");
+    }
 }
+
 
 void registerUser() {
     if (userCount >= MAX_USERS) {
@@ -49,9 +60,15 @@ void registerUser() {
     scanf(" %[^\n]", newUser.username);
     printf("Password: ");
     scanf(" %[^\n]", newUser.password);
+    printf("Contact Number: ");
+    scanf(" %[^\n]", newUser.contactNumber);
+    printf("Email: ");
+    scanf(" %[^\n]", newUser.email);
 
     users[userCount++] = newUser;
     printf("Registration successful!\n");
+
+    saveUsersToFile();
 }
 
 User* login() {
@@ -101,6 +118,8 @@ void donateBook(User* user) {
 
     books[bookCount++] = newBook;
     printf("Book donated successfully!\n");
+
+    saveBooksToFile();
 }
 
 void listBooks() {
@@ -158,14 +177,117 @@ void requestBook(User* user) {
     }
 }
 
+void saveUsersToFile() {
+    FILE* file = fopen("users.txt", "w");
+    if (file == NULL) {
+        printf("Failed to open users.txt for writing.\n");
+        return;
+    }
+
+    for (int i = 0; i < userCount; i++) {
+        User* user = &users[i];
+        fprintf(file, "%s;%s;%s;%s;%d\n", user->username, user->password, user->contactNumber, user->email, user->loggedIn);
+    }
+
+    fclose(file);
+    printf("Users data saved to users.txt.\n");
+}
+
+void saveBooksToFile() {
+    FILE* file = fopen("books.txt", "w");
+    if (file == NULL) {
+        printf("Failed to open books.txt for writing.\n");
+        return;
+    }
+
+    for (int i = 0; i < bookCount; i++) {
+        Book book = books[i];
+        fprintf(file, "%s;%s;%d;%s;%d;%s\n", book.title, book.author, book.year, book.condition, book.donated, book.donor);
+    }
+
+    fclose(file);
+    printf("Books data saved to books.txt.\n");
+}
+
+void loadUsersFromFile() {
+    FILE* file = fopen("users.txt", "r");
+    if (file == NULL) {
+        printf("Failed to open users.txt for reading.\n");
+        return;
+    }
+
+    char line[512];
+    while (fgets(line, sizeof(line), file)) {
+        char* username = strtok(line, ";");
+        char* password = strtok(NULL, ";");
+        char* contactNumber = strtok(NULL, ";");
+        char* email = strtok(NULL, ";");
+        int loggedIn = atoi(strtok(NULL, ";\n"));
+
+        User newUser;
+        strcpy(newUser.username, username);
+        strcpy(newUser.password, password);
+        strcpy(newUser.contactNumber, contactNumber);
+        strcpy(newUser.email, email);
+        newUser.loggedIn = loggedIn;
+
+        users[userCount++] = newUser;
+    }
+
+    fclose(file);
+}
+
+void loadBooksFromFile() {
+    FILE* file = fopen("books.txt", "r");
+    if (file == NULL) {
+        printf("Failed to open books.txt for reading.\n");
+        return;
+    }
+
+    char line[512];
+    while (fgets(line, sizeof(line), file)) {
+        char* title = strtok(line, ";");
+        char* author = strtok(NULL, ";");
+        int year = atoi(strtok(NULL, ";"));
+        char* condition = strtok(NULL, ";");
+        int donated = atoi(strtok(NULL, ";"));
+        char* donor = strtok(NULL, ";\n");
+
+        Book newBook;
+        strcpy(newBook.title, title);
+        strcpy(newBook.author, author);
+        newBook.year = year;
+        strcpy(newBook.condition, condition);
+        newBook.donated = donated;
+        strcpy(newBook.donor, donor);
+
+        books[bookCount++] = newBook;
+    }
+
+    fclose(file);
+}
+
+void logout(User* user) {
+    if (!user || !user->loggedIn) {
+        printf("You are not currently logged in.\n");
+        return;
+    }
+
+    user->loggedIn = false;
+    printf("Logged out successfully.\n");
+}
+
 int main() {
     int choice;
     User* loggedInUser = NULL;
 
     printf("Welcome to Book Buddies - A program to donate used books to other students.\n");
 
+    loadUsersFromFile();
+    loadBooksFromFile();
+
     while (1) {
-        displayMenu();
+        displayMenu(loggedInUser);
 
         printf("\nEnter your choice (1-6): ");
         scanf("%d", &choice);
@@ -193,8 +315,16 @@ int main() {
                 requestBook(loggedInUser);
                 break;
             case 6:
-                printf("Thank you for using Book Buddies. Goodbye!\n");
-                exit(0);
+                if (loggedInUser && loggedInUser->loggedIn) {
+                    logout(loggedInUser);
+                    loggedInUser = NULL;
+                } else {
+                    saveUsersToFile();
+                    saveBooksToFile();
+                    printf("Thank you for using Book Buddies. Goodbye!\n");
+                    exit(0);
+                }
+                break;
             default:
                 printf("Invalid choice. Please try again.\n");
         }
