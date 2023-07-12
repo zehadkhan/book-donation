@@ -32,11 +32,12 @@ int bookCount = 0;
 void displayMenu(User* user) {
     printf("\nBook Buddies - Donate Used Books\n");
     if (user && user->loggedIn) {
-        printf("1. Donate a book\n");
-        printf("2. List all donated books\n");
-        printf("3. Request a book\n");
-        printf("4. Logout (Currently logged in as: %s)\n", user->username);
-        printf("5. Exit\n");
+        printf("1. Register\n");
+        printf("2. Login\n");
+        printf("3. Donate a book\n");
+        printf("4. List all donated books\n");
+        printf("5. Request a book\n");
+        printf("6. Logout (Currently logged in as: %s)\n", user->username);
     } else {
         printf("1. Register\n");
         printf("2. Login\n");
@@ -171,7 +172,7 @@ void requestBook(User* user) {
 
     if (choice == 'y' || choice == 'Y') {
         requestedBook->donated = true;
-        printf("Book requested successfully! Contact the donor for further details.\n");
+        printf("Book requested successfully! Please Wait for the Donors Comfirmation.\n");
     } else {
         printf("Book request canceled.\n");
     }
