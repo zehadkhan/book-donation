@@ -21,6 +21,7 @@ typedef struct {
     char password[100];
     char contactNumber[20];
     char email[100];
+    char role[10]; // New field to store the role (User or Donor)
     bool loggedIn;
 } User;
 
@@ -51,7 +52,7 @@ void displayMenu(User* user) {
         printf("4. List all donated books\n");
         printf("5. Request a book\n");
         printf("6. Notification (%d)\n", notificationCount);
-        printf("7. Logout (Currently logged in as: %s)\n", user->username);
+        printf("7. Logout (Currently logged in as: %s (%s))\n", user->username, user->role);
     } else {
         printf("1. Register\n");
         printf("2. Login\n");
@@ -69,6 +70,18 @@ void registerUser() {
         return;
     }
 
+    int choice;
+    printf("\nSelect role:\n");
+    printf("1. User\n");
+    printf("2. Donor\n");
+    printf("Enter choice: ");
+    scanf("%d", &choice);
+
+    if (choice != 1 && choice != 2) {
+        printf("Invalid choice. Please try again.\n");
+        return;
+    }
+
     User newUser;
     printf("\nEnter registration details:\n");
     printf("Username: ");
@@ -79,6 +92,12 @@ void registerUser() {
     scanf(" %[^\n]", newUser.contactNumber);
     printf("Email: ");
     scanf(" %[^\n]", newUser.email);
+
+    if (choice == 1) {
+        strcpy(newUser.role, "User");
+    } else {
+        strcpy(newUser.role, "Donor");
+    }
 
     users[userCount++] = newUser;
     printf("Registration successful!\n");
@@ -288,7 +307,7 @@ void saveUsersToFile() {
 
     for (int i = 0; i < userCount; i++) {
         User* user = &users[i];
-        fprintf(file, "%s;%s;%s;%s;%d\n", user->username, user->password, user->contactNumber, user->email, user->loggedIn);
+        fprintf(file, "%s;%s;%s;%s;%s;%d\n", user->username, user->password, user->contactNumber, user->email, user->role, user->loggedIn);
     }
 
     fclose(file);
@@ -341,6 +360,7 @@ void loadUsersFromFile() {
         char* password = strtok(NULL, ";");
         char* contactNumber = strtok(NULL, ";");
         char* email = strtok(NULL, ";");
+        char* role = strtok(NULL, ";");
         int loggedIn = atoi(strtok(NULL, ";\n"));
 
         User newUser;
@@ -348,6 +368,7 @@ void loadUsersFromFile() {
         strcpy(newUser.password, password);
         strcpy(newUser.contactNumber, contactNumber);
         strcpy(newUser.email, email);
+        strcpy(newUser.role, role);
         newUser.loggedIn = loggedIn;
 
         users[userCount++] = newUser;
@@ -432,8 +453,8 @@ int main() {
 
     printf("Welcome to Book Buddies - A program to donate used books to other students.\n");
 
-   loadUsersFromFile();
-   loadBooksFromFile();
+    loadUsersFromFile();
+    loadBooksFromFile();
     loadNotificationsFromFile();
 
     while (1) {
