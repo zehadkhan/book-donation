@@ -5,6 +5,7 @@
 
 #define MAX_USERS 100
 #define MAX_BOOKS 100
+#define MAX_NOTIFICATIONS 100
 
 typedef struct {
     char title[100];
@@ -20,14 +21,27 @@ typedef struct {
     char password[100];
     char contactNumber[20];
     char email[100];
+    char role[10]; // New field to store the role (User or Donor)
     bool loggedIn;
 } User;
+
+typedef struct {
+    char bookTitle[100];
+    char donor[100];
+    bool accepted;
+    char donorName[100];
+    char donorContact[20];
+    char donorEmail[100];
+} Notification;
 
 User users[MAX_USERS];
 int userCount = 0;
 
 Book books[MAX_BOOKS];
 int bookCount = 0;
+
+Notification notifications[MAX_NOTIFICATIONS];
+int notificationCount = 0;
 
 void displayMenu(User* user) {
     printf("\nBook Buddies - Donate Used Books\n");
@@ -37,21 +51,34 @@ void displayMenu(User* user) {
         printf("3. Donate a book\n");
         printf("4. List all donated books\n");
         printf("5. Request a book\n");
-        printf("6. Logout (Currently logged in as: %s)\n", user->username);
+        printf("6. Notification (%d)\n", notificationCount);
+        printf("7. Logout (Currently logged in as: %s (%s))\n", user->username, user->role);
     } else {
         printf("1. Register\n");
         printf("2. Login\n");
         printf("3. Donate a book\n");
         printf("4. List all donated books\n");
         printf("5. Request a book\n");
-        printf("6. Exit\n");
+        printf("6. Notification (%d)\n", notificationCount);
+        printf("7. Exit\n");
     }
 }
-
 
 void registerUser() {
     if (userCount >= MAX_USERS) {
         printf("Sorry, no more registrations can be accepted at the moment.\n");
+        return;
+    }
+
+    int choice;
+    printf("\nSelect role:\n");
+    printf("1. User\n");
+    printf("2. Donor\n");
+    printf("Enter choice: ");
+    scanf("%d", &choice);
+
+    if (choice != 1 && choice != 2) {
+        printf("Invalid choice. Please try again.\n");
         return;
     }
 
@@ -65,6 +92,12 @@ void registerUser() {
     scanf(" %[^\n]", newUser.contactNumber);
     printf("Email: ");
     scanf(" %[^\n]", newUser.email);
+
+    if (choice == 1) {
+        strcpy(newUser.role, "User");
+    } else {
+        strcpy(newUser.role, "Donor");
+    }
 
     users[userCount++] = newUser;
     printf("Registration successful!\n");
@@ -123,7 +156,7 @@ void donateBook(User* user) {
     saveBooksToFile();
 }
 
-void listBooks() {
+void listBooks(User* user) {
     if (bookCount == 0) {
         printf("No books have been donated yet.\n");
         return;
@@ -132,7 +165,36 @@ void listBooks() {
     printf("\nList of donated books:\n");
     for (int i = 0; i < bookCount; i++) {
         Book book = books[i];
-        printf("%d. %s by %s, %d, Condition: %s\n", i+1, book.title, book.author, book.year, book.condition);
+        printf("%d. %s by %s, %d, Condition: %s\n", i + 1, book.title, book.author, book.year, book.condition);
+    }
+
+    if (user && user->loggedIn) {
+        printf("\nEnter the book number to view donor information: ");
+        int bookIndex;
+        scanf("%d", &bookIndex);
+        bookIndex -= 1; // Adjusting to zero-based indexing
+
+        if (bookIndex < 0 || bookIndex >= bookCount) {
+            printf("Invalid book number. Please try again.\n");
+            return;
+        }
+
+        Book* selectedBook = &books[bookIndex];
+        if (selectedBook->donated) {
+            printf("\nDonor Information:\n");
+            for (int i = 0; i < notificationCount; i++) {
+                Notification* notification = &notifications[i];
+                if (strcmp(notification->bookTitle, selectedBook->title) == 0 && notification->accepted) {
+                    printf("Name: %s\n", notification->donorName);
+                    printf("Contact: %s\n", notification->donorContact);
+                    printf("Email: %s\n", notification->donorEmail);
+                    return;
+                }
+            }
+            printf("No donor information available for the selected book.\n");
+        } else {
+            printf("The selected book has not been donated yet.\n");
+        }
     }
 }
 
@@ -172,9 +234,67 @@ void requestBook(User* user) {
 
     if (choice == 'y' || choice == 'Y') {
         requestedBook->donated = true;
-        printf("Book requested successfully! Please Wait for the Donors Comfirmation.\n");
+
+        Notification newNotification;
+        strcpy(newNotification.bookTitle, requestedBook->title);
+        strcpy(newNotification.donor, requestedBook->donor);
+        newNotification.accepted = false;
+        notifications[notificationCount++] = newNotification;
+
+        printf("Book requested successfully! Please wait for the donor's confirmation.\n");
+        saveNotificationsToFile();
     } else {
         printf("Book request canceled.\n");
+    }
+}
+
+void displayNotifications(User* user) {
+    if (!user || !user->loggedIn) {
+        printf("You must be logged in to view notifications.\n");
+        return;
+    }
+
+    if (notificationCount == 0) {
+        printf("No new notifications.\n");
+        return;
+    }
+
+    printf("\nList of Notifications:\n");
+    for (int i = 0; i < notificationCount; i++) {
+        Notification* notification = &notifications[i];
+        if (!notification->accepted) {
+            printf("%d. Book: %s\n", i + 1, notification->bookTitle);
+        }
+    }
+
+    printf("Enter the notification number to accept/reject (0 to go back): ");
+    int choice;
+    scanf("%d", &choice);
+    if (choice > 0 && choice <= notificationCount) {
+        Notification* selectedNotification = &notifications[choice - 1];
+        if (!selectedNotification->accepted) {
+            printf("Do you want to accept this notification? (y/n): ");
+            char acceptChoice;
+            scanf(" %c", &acceptChoice);
+            if (acceptChoice == 'y' || acceptChoice == 'Y') {
+                printf("Enter your name: ");
+                scanf(" %[^\n]", selectedNotification->donorName);
+                printf("Enter your contact number: ");
+                scanf(" %[^\n]", selectedNotification->donorContact);
+                printf("Enter your email: ");
+                scanf(" %[^\n]", selectedNotification->donorEmail);
+                selectedNotification->accepted = true;
+                printf("Notification accepted! Thank you for your donation.\n");
+                saveNotificationsToFile();
+                return;
+            } else {
+                printf("Notification rejected.\n");
+            }
+        } else {
+            printf("You have already accepted this notification.\n");
+        }
+    } else if (choice != 0) {
+        printf("Invalid choice. Please try again.\n");
     }
 }
 
@@ -187,7 +307,7 @@ void saveUsersToFile() {
 
     for (int i = 0; i < userCount; i++) {
         User* user = &users[i];
-        fprintf(file, "%s;%s;%s;%s;%d\n", user->username, user->password, user->contactNumber, user->email, user->loggedIn);
+        fprintf(file, "%s;%s;%s;%s;%s;%d\n", user->username, user->password, user->contactNumber, user->email, user->role, user->loggedIn);
     }
 
     fclose(file);
@@ -210,6 +330,23 @@ void saveBooksToFile() {
     printf("Books data saved to books.txt.\n");
 }
 
+void saveNotificationsToFile() {
+    FILE* file = fopen("notifications.txt", "w");
+    if (file == NULL) {
+        printf("Failed to open notifications.txt for writing.\n");
+        return;
+    }
+
+    for (int i = 0; i < notificationCount; i++) {
+        Notification notification = notifications[i];
+        fprintf(file, "%s;%s;%d;%s;%s;%s\n", notification.bookTitle, notification.donor,
+                notification.accepted, notification.donorName, notification.donorContact, notification.donorEmail);
+    }
+
+    fclose(file);
+    printf("Notifications data saved to notifications.txt.\n");
+}
+
 void loadUsersFromFile() {
     FILE* file = fopen("users.txt", "r");
     if (file == NULL) {
@@ -223,6 +360,7 @@ void loadUsersFromFile() {
         char* password = strtok(NULL, ";");
         char* contactNumber = strtok(NULL, ";");
         char* email = strtok(NULL, ";");
+        char* role = strtok(NULL, ";");
         int loggedIn = atoi(strtok(NULL, ";\n"));
 
         User newUser;
@@ -230,6 +368,7 @@ void loadUsersFromFile() {
         strcpy(newUser.password, password);
         strcpy(newUser.contactNumber, contactNumber);
         strcpy(newUser.email, email);
+        strcpy(newUser.role, role);
         newUser.loggedIn = loggedIn;
 
         users[userCount++] = newUser;
@@ -268,6 +407,36 @@ void loadBooksFromFile() {
     fclose(file);
 }
 
+void loadNotificationsFromFile() {
+    FILE* file = fopen("notifications.txt", "r");
+    if (file == NULL) {
+        printf("Failed to open notifications.txt for reading.\n");
+        return;
+    }
+
+    char line[512];
+    while (fgets(line, sizeof(line), file)) {
+        char* bookTitle = strtok(line, ";");
+        char* donor = strtok(NULL, ";");
+        int accepted = atoi(strtok(NULL, ";"));
+        char* donorName = strtok(NULL, ";");
+        char* donorContact = strtok(NULL, ";");
+        char* donorEmail = strtok(NULL, ";\n");
+
+        Notification newNotification;
+        strcpy(newNotification.bookTitle, bookTitle);
+        strcpy(newNotification.donor, donor);
+        newNotification.accepted = accepted;
+        strcpy(newNotification.donorName, donorName);
+        strcpy(newNotification.donorContact, donorContact);
+        strcpy(newNotification.donorEmail, donorEmail);
+
+        notifications[notificationCount++] = newNotification;
+    }
+
+    fclose(file);
+}
+
 void logout(User* user) {
     if (!user || !user->loggedIn) {
         printf("You are not currently logged in.\n");
@@ -286,14 +455,15 @@ int main() {
 
     loadUsersFromFile();
     loadBooksFromFile();
+    loadNotificationsFromFile();
 
     while (1) {
         displayMenu(loggedInUser);
 
-        printf("\nEnter your choice (1-6): ");
+        printf("\nEnter your choice (1-7): ");
         scanf("%d", &choice);
 
-        switch(choice) {
+        switch (choice) {
             case 1:
                 registerUser();
                 break;
@@ -310,18 +480,22 @@ int main() {
                 donateBook(loggedInUser);
                 break;
             case 4:
-                listBooks();
+                listBooks(loggedInUser);
                 break;
             case 5:
                 requestBook(loggedInUser);
                 break;
             case 6:
+                displayNotifications(loggedInUser);
+                break;
+            case 7:
                 if (loggedInUser && loggedInUser->loggedIn) {
                     logout(loggedInUser);
                     loggedInUser = NULL;
                 } else {
                     saveUsersToFile();
                     saveBooksToFile();
+                    saveNotificationsToFile();
                     printf("Thank you for using Book Buddies. Goodbye!\n");
                     exit(0);
                 }
